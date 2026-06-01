@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import ReactMarkdown from 'react-markdown'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -114,9 +115,9 @@ export default function Home() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <h3 className="text-lg font-semibold">Analyse IA :</h3>
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                {result.analyse_ia}
-              </p>
+              <div className="prose prose-slate dark:prose-invert max-w-none mt-6">
+                <ReactMarkdown>{result.analyse_ia}</ReactMarkdown>
+              </div>
             </div>
           </CardContent>
         </Card>
