@@ -1,65 +1,241 @@
-import Image from "next/image";
+"use client"
+
+import { useEffect, useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Skeleton } from "@/components/ui/skeleton"
+import { supabase } from "@/lib/supabase"
+import type { Lead } from "@/types/lead"
+import type { RealtimeChannel } from "@supabase/supabase-js"
 
 export default function Home() {
+  const [formData, setFormData] = useState({
+    nom: "",
+    age: "",
+    revenus_mensuels: "",
+    epargne_liquide: "",
+    patrimoine_immobilier: "",
+  })
+  const [isLoading, setIsLoading] = useState(false)
+  const [result, setResult] = useState<{ id: string; analyse_ia: string } | null>(null)
+  const [channel, setChannel] = useState<RealtimeChannel | null>(null)
+
+  // Cleanup realtime channel on component unmount
+  useEffect(() => {
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel)
+      }
+    }
+  }, [channel])
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target
+    setFormData((prev) => ({ ...prev, [name]: value }))
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+
+    // Insert data into leads_patrimoine table
+    const { data, error } = await supabase
+      .from("leads_patrimoine")
+      .insert({
+        nom: formData.nom,
+        age: parseInt(formData.age),
+        revenus_mensuels: parseFloat(formData.revenus_mensuels),
+        epargne_liquide: parseFloat(formData.epargne_liquide),
+        patrimoine_immobilier: parseFloat(formData.patrimoine_immobilier),
+        statut: "en_attente",
+        analyse_ia: null,
+      })
+      .select("id")
+      .single()
+
+    if (error) {
+      console.error("Insert error:", error)
+      setIsLoading(false)
+      return
+    }
+
+    const insertedId = data.id
+
+    // Subscribe to realtime updates for this specific lead
+    // We filter for UPDATE events on the row with the inserted id
+    const newChannel = supabase
+      .channel(`lead-updates-${insertedId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "leads_patrimoine",
+          filter: `id=eq.${insertedId}`,
+        },
+        (payload) => {
+          // Check if the statut has changed to 'analyse_terminee'
+          const updatedLead = payload.new as Lead
+          
+          if (updatedLead.statut === "analyse_terminee") {
+            // Stop the loader and unsubscribe from the channel
+            setIsLoading(false)
+            setResult({
+              id: updatedLead.id,
+              analyse_ia: updatedLead.analyse_ia || "",
+            })
+            
+            // Unsubscribe from the realtime channel to prevent memory leaks
+            supabase.removeChannel(newChannel)
+            setChannel(null)
+          }
+        }
+      )
+      .subscribe((status) => {
+        // Log subscription status for debugging
+        console.log("Realtime subscription status:", status)
+      })
+
+    setChannel(newChannel)
+  }
+
+  if (result) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center p-4">
+        <Card className="w-full max-w-2xl">
+          <CardHeader>
+            <CardTitle className="text-2xl">Analyse terminée</CardTitle>
+            <CardDescription>
+              Votre analyse financière a été traitée.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <h3 className="text-lg font-semibold">Analyse IA :</h3>
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                {result.analyse_ia}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+    <div className="flex flex-1 flex-col items-center justify-center p-4">
+      {isLoading ? (
+        // Loading state with Skeleton
+        <Card className="w-full max-w-2xl">
+          <CardHeader>
+            <CardTitle className="text-2xl">Traitement de vos données</CardTitle>
+            <CardDescription>
+              Veuillez patienter pendant que notre IA analyse vos informations
+              financières.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-3/4" />
+          </CardContent>
+        </Card>
+      ) : (
+        // Form state
+        <Card className="w-full max-w-2xl">
+          <CardHeader>
+            <CardTitle className="text-2xl">
+              Évaluation Patrimoniale
+            </CardTitle>
+            <CardDescription>
+              Entrez vos informations financières pour recevoir des conseils
+              personnalisés.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="nom">Nom complet</Label>
+                <Input
+                  id="nom"
+                  name="nom"
+                  value={formData.nom}
+                  onChange={handleInputChange}
+                  placeholder="Jean Dupont"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="age">Âge</Label>
+                <Input
+                  id="age"
+                  name="age"
+                  type="number"
+                  value={formData.age}
+                  onChange={handleInputChange}
+                  placeholder="35"
+                  required
+                  min="18"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="revenus_mensuels">Revenus mensuels (€)</Label>
+                <Input
+                  id="revenus_mensuels"
+                  name="revenus_mensuels"
+                  type="number"
+                  value={formData.revenus_mensuels}
+                  onChange={handleInputChange}
+                  placeholder="5000"
+                  required
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="epargne_liquide">Épargne liquide (€)</Label>
+                <Input
+                  id="epargne_liquide"
+                  name="epargne_liquide"
+                  type="number"
+                  value={formData.epargne_liquide}
+                  onChange={handleInputChange}
+                  placeholder="50000"
+                  required
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="patrimoine_immobilier">
+                  Patrimoine immobilier (€)
+                </Label>
+                <Input
+                  id="patrimoine_immobilier"
+                  name="patrimoine_immobilier"
+                  type="number"
+                  value={formData.patrimoine_immobilier}
+                  onChange={handleInputChange}
+                  placeholder="250000"
+                  required
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+
+              <Button type="submit" className="w-full">
+                Obtenir mon analyse
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      )}
     </div>
-  );
+  )
 }
