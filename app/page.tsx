@@ -1,17 +1,16 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import ReactMarkdown from 'react-markdown'
+import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import { supabase } from "@/lib/supabase"
-import type { Lead } from "@/types/lead"
-import type { RealtimeChannel } from "@supabase/supabase-js"
 
 export default function Home() {
+  const router = useRouter()
   const [formData, setFormData] = useState({
     nom: "",
     age: "",
@@ -20,17 +19,6 @@ export default function Home() {
     patrimoine_immobilier: "",
   })
   const [isLoading, setIsLoading] = useState(false)
-  const [result, setResult] = useState<{ id: string; analyse_ia: string } | null>(null)
-  const [channel, setChannel] = useState<RealtimeChannel | null>(null)
-
-  // Cleanup realtime channel on component unmount
-  useEffect(() => {
-    return () => {
-      if (channel) {
-        supabase.removeChannel(channel)
-      }
-    }
-  }, [channel])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -64,65 +52,8 @@ export default function Home() {
 
     const insertedId = data.id
 
-    // Subscribe to realtime updates for this specific lead
-    // We filter for UPDATE events on the row with the inserted id
-    const newChannel = supabase
-      .channel(`lead-updates-${insertedId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "leads_patrimoine",
-          filter: `id=eq.${insertedId}`,
-        },
-        (payload) => {
-          // Check if the statut has changed to 'analyse_terminee'
-          const updatedLead = payload.new as Lead
-          
-          if (updatedLead.statut === "analyse_terminee") {
-            // Stop the loader and unsubscribe from the channel
-            setIsLoading(false)
-            setResult({
-              id: updatedLead.id,
-              analyse_ia: updatedLead.analyse_ia || "",
-            })
-            
-            // Unsubscribe from the realtime channel to prevent memory leaks
-            supabase.removeChannel(newChannel)
-            setChannel(null)
-          }
-        }
-      )
-      .subscribe((status) => {
-        // Log subscription status for debugging
-        console.log("Realtime subscription status:", status)
-      })
-
-    setChannel(newChannel)
-  }
-
-  if (result) {
-    return (
-      <div className="flex flex-1 flex-col items-center justify-center p-4">
-        <Card className="w-full max-w-2xl">
-          <CardHeader>
-            <CardTitle className="text-2xl">Analyse terminée</CardTitle>
-            <CardDescription>
-              Votre analyse financière a été traitée.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <h3 className="text-lg font-semibold">Analyse IA :</h3>
-              <div className="prose prose-slate dark:prose-invert max-w-none mt-6">
-                <ReactMarkdown>{result.analyse_ia}</ReactMarkdown>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    )
+    // Redirect to the lead result page with UUID in URL
+    router.push(`/leads/${insertedId}`)
   }
 
   return (
