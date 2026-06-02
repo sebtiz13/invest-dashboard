@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { notFound, useParams } from "next/navigation"
 import ReactMarkdown from 'react-markdown'
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { supabase } from "@/lib/supabase"
@@ -188,6 +189,14 @@ export default function LeadResultPage() {
             <div className="prose prose-slate dark:prose-invert max-w-none mt-6">
               <ReactMarkdown>{lead.analyse_ia || "Aucune analyse disponible."}</ReactMarkdown>
             </div>
+          </div>
+          <div className="pt-4">
+            <Button 
+              className="w-full" 
+              onClick={() => window.open("https://www.linkedin.com/in/sebastien-rodriguez/", "_blank")}
+            >
+              Me contacter
+            </Button>
           </div>
         </CardContent>
       </Card>
