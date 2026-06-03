@@ -1,0 +1,174 @@
+{
+  "name": "new lead",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "3f91ada4-d2c9-4236-98f2-212bed5f4701",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "d54a0bd1-691b-4b12-8e76-0652c7bc656a",
+      "name": "Webhook",
+      "webhookId": "3f91ada4-d2c9-4236-98f2-212bed5f4701"
+    },
+    {
+      "parameters": {
+        "model": "mistral-small-latest",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatMistralCloud",
+      "typeVersion": 1,
+      "position": [
+        320,
+        176
+      ],
+      "id": "b8730abf-19ec-4f37-a931-53350cbc3d36",
+      "name": "Mistral Cloud Chat Model",
+      "credentials": {
+        "mistralCloudApi": {
+          "id": "js0GCiWtZyyf4plu",
+          "name": "Mistral Cloud account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "= DONNÉES DU PROSPECT :\n- Nom : {{ $json.body.record.nom }}\n- Âge : {{ $json.body.record.age }} ans\n- Revenus mensuels : {{ $json.body.record.revenus_mensuels }} €\n- Épargne liquide : {{ $json.body.record.epargne_liquide }} €\n- Patrimoine immobilier : {{ $json.body.record.patrimoine_immobilier }} € ",
+        "options": {
+          "systemMessage": "Tu es un conseiller en gestion de patrimoine expert, travaillant pour le cabinet \"Toulouse Invest\".\nAnalyse la situation financière de ce prospect et rédige une courte pré-analyse engageante et professionnelle.\n\nINSTRUCTIONS DE FORMATAGE (Obligatoire) :\n- Rédige ta réponse en Markdown propre.\n- Utilise des titres de niveau 3 (###) pour structurer : \"Analyse Rapide\", \"Points Forts\", \"Axes d'Amélioration\".\n- Utilise des listes à puces pour la lisibilité.\n- Adopte un ton rassurant et expert.\n- Termine par un court paragraphe d'appel à l'action invitant à prendre un premier rendez-vous avec le cabinet pour creuser la stratégie.\n- Ne rajoute aucun commentaire hors du markdown."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        320,
+        0
+      ],
+      "id": "13c79c0b-cfc2-4793-a2c0-dd16ea09c620",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "leads_patrimoine",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Get a row').item.json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "statut",
+              "fieldValue": "analyse_terminee"
+            },
+            {
+              "fieldId": "=analyse_ia",
+              "fieldValue": "={{ $json.output }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        720,
+        0
+      ],
+      "id": "4c97a9e4-fd72-446a-af98-9228432ea633",
+      "name": "Update a row",
+      "credentials": {
+        "supabaseApi": {
+          "id": "W597dXPauKSWLmb6",
+          "name": "Supabase account"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Webhook": [
+      {
+        "json": {
+          "body": {
+            "type": "INSERT",
+            "table": "leads_patrimoine",
+            "record": {
+              "id": "d59bd812-54ab-47ce-b86f-5176e8f2a2df",
+              "age": 35,
+              "nom": "Jean Dupont",
+              "statut": "en_attente",
+              "analyse_ia": null,
+              "created_at": "2026-06-02 13:38:12.859964+00",
+              "epargne_liquide": 50000,
+              "revenus_mensuels": 5000,
+              "patrimoine_immobilier": 250000
+            },
+            "schema": "public",
+            "old_record": null
+          }
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mistral Cloud Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Update a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "6b18f981-64e6-406d-bb3b-6bef88aacecf",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "89892a75584b940cae1b57e6fbaeefef7d6601c795c99f277b5c4b98960f6832"
+  },
+  "id": "UyB917qZbm7AYDhj",
+  "tags": []
+}

@@ -65,17 +65,25 @@ The `leads_patrimoine` table contains:
 
 ---
 
-## Mock Backend
+## AI Processing Backend
 
-For this proof of concept, AI analysis is simulated using:
+AI analysis is powered by **n8n workflows** with the following architecture:
 
-- **Supabase Edge Function** (`mock-ia-analysis`): Deployed and triggered via Database Webhook on `INSERT` events to the `leads_patrimoine` table.
-- **5-second delay**: Simulates AI processing time.
-- **Dummy Markdown generation**: Produces a formatted financial analysis response.
+### n8n Workflow: `new-lead`
 
-In production, this would be replaced by:
-- **n8n workflows** for orchestration
-- **Mistral AI API** for actual AI analysis
+- **Trigger**: Supabase Database Webhook on `INSERT` events to the `leads_patrimoine` table
+- **AI Model**: Mistral Cloud (`mistral-small-latest`) via LangChain integration
+- **Processing**: Structured financial analysis with formatted Markdown output
+- **Output**: Updates the lead record with `statut: analyse_terminee` and `analyse_ia` content
+
+### Workflow Nodes
+
+1. **Webhook** - Receives lead data from Supabase INSERT events
+2. **AI Agent** - LangChain agent with financial advisor persona for "Toulouse Invest"
+3. **Mistral Cloud Chat Model** - Provides the LLM capabilities
+4. **Supabase Update** - Writes analysis results back to the database
+
+The frontend never calls AI APIs directly. Instead, it uses the **Insert & Listen pattern**: insert data, then subscribe to Realtime updates. When the n8n workflow completes the analysis, Supabase fires the UPDATE event, and the frontend renders the results.
 
 ---
 
